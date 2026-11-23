@@ -110,10 +110,61 @@ Two gaps of raea/tone against Tone.js, found writing it (worked around there, to
   together and the last wins.
 - A Synth's `frequency` automation doesn't move a note that's sounding (the chirps' sweeps are MembraneSynth's own).
 
+## three.js: the light web host
+
+`playThree` (sdk/web/src/three.tsx) plays a composition as `play` does, with the same Clock, input and fold, but its
+3D is drawn by three.js on WebGL through raea's own three.js host (sdk/r3f/src/three: Scene3d, and Effects for the
+frame effects and Bevy's TonyMcMapface table). It needs no wasm and no WebGPU, so it plays wherever WebGL does,
+phones included. What three.js can't draw (kinds.ts "engine": Bevy's shaders, volumetric fog) is named in the console
+and left out; such an edit needs raea-web.
+
+```sh
+bun sdk/web/tools/export-three.ts EDIT.tsx -o DIR [--composition ID] [--title TITLE]
+    [--touch "Paw:West,Jump:South,Run:RightTrigger2"] [--corner "↻:Start"] [--no-touch] [--no-tony] [--fps] [--serve [PORT]]
+```
+
+It writes a static page:
+
+- `index.html`
+- one minified `game.js`, carrying a single copy each of three, React and Tone.js
+- the project's `assets/`
+- `LICENSE-raea.md` and `NOTICE.txt`
+
+The page takes four query parameters:
+
+| Parameter | What it does |
+|---|---|
+| `?frame=N` | Holds that frame, to compare with `raea render --frame N` |
+| `?tony=0` | Uses three's AgX curve with no extra pass, for slow phones |
+| `?fps=1` / `?fps=0` | Shows or hides the frame counter (on by default with `--fps`) |
+
+- **The page is laid out in the composition's pixels.** It is scaled to fit the stage, and its box takes the stage's
+  shape, so a HUD written for 1920x1080 keeps its proportions on a phone and what is pinned to an edge stays on it.
+- **Input** comes from sdk/web/src/input.ts: keys, the pointer in the page's pixels, and the first gamepad. On a touch
+  screen, `--touch` adds an on-screen stick (the left half of the screen) and buttons, read as that gamepad, so a game
+  written for a pad plays on a phone unchanged.
+- **Sound.** `raea/tone` is Tone.js plus raea's `bus`, `buses`, `vary` and `<Sfx>` (sdk/web/src/tone.ts). The buses
+  lift what <Mix> would level, into a limiter at the mix's ceiling.
+
+Measured 11-23 on a game (Cat Planet: a vertex-coloured kitten of ~8,000 fur tufts, 62 props, instanced trees,
+furniture, grass and flowers) in Chrome on the M5 Pro Mac at 1920x1080:
+
+- **Frames 60 and 900 against `raea render --frame`.** Mean luma 0.397 against 0.393, and 0.384 against 0.380. The
+  HUD's text is identical, and so are the game's state after 900 folded frames and the camera.
+- **Speed.** 120 fps, with 1.2 ms of CPU a frame for the sync and draw.
+- **Size.** `game.js` is 599 KB gzipped, against raea-web's 7.9 MB of wasm.
+
+Writing it found three things, each fixed here:
+
+- **raea-web drew no <Instances> copies.** sdk/web's collector never sent an element's `data-at`, and
+  engine/web/src/scene.rs set every part's `at` to None. Both now carry the placements, as `s` carries a shape: sent
+  when it changes and kept by id.
+- **Scene3d rolled a camera whose up isn't +Y.** It placed the camera by `lookAt` alone; it now takes Camera3d's
+  `rotation` when the page gives it.
+- **sdk/web imported `@raea/playable/host/input`,** which isn't in this repo. sdk/web/src/input.ts is that input.
+
 ## Next
 
-- **three.js as a second, light web host.** The rows are the contract, so a host that draws rows with three.js (a few
-  hundred KB, no wasm) can play the same edits wherever raea-web is too heavy, with raea-web as its reference.
 - **R3F both ways.** Authoring in React Three Fiber compiled to rows, so an R3F scene plays on raea's engines; and an
   edit exported back out as R3F components, so a team can take a raea scene into its own three.js app. One edit,
   several targets.

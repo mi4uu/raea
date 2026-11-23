@@ -6,7 +6,7 @@
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { Clock, getCompositions, type InputTimeline, type RegisteredComposition } from "raea";
-import { Input } from "@raea/playable/host/input";
+import { Input } from "./input";
 import { Collector, UNDER3D_CSS, clearUnder3d } from "./collect";
 
 /** raea-web's engine, as wasm-bindgen exports it (engine/web: `import init, { Raea } from "./raea_web.js"`). */
