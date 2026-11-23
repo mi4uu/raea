@@ -80,7 +80,11 @@ export function setCamera(had: THREE.Camera | undefined, p: Props): THREE.Perspe
     : had instanceof THREE.PerspectiveCamera ? had : new THREE.PerspectiveCamera();
   cam.position.set(...(vec(p.position) ?? [0, 0, 5]));
   cam.up.set(...(vec(p.up) ?? [0, 1, 0]));
-  cam.lookAt(...(vec(p.lookAt) ?? [0, 0, 0]));
+  // the camera's own turn when the page gives one (Camera3d's `rotation`, which places it exactly, rolled or not): a
+  // lookAt alone takes +Y as up, which rolls a camera whose up is elsewhere (a chase camera on a round planet)
+  const q = p.rotation;
+  if (Array.isArray(q) && q.length === 4 && q.every((x) => typeof x === "number")) cam.quaternion.set(q[0], q[1], q[2], q[3]);
+  else cam.lookAt(...(vec(p.lookAt) ?? [0, 0, 0]));
   cam.near = typeof p.near === "number" ? p.near : 0.1;
   cam.far = typeof p.far === "number" ? p.far : 1000;
   if (cam instanceof THREE.PerspectiveCamera) {
