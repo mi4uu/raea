@@ -1,18 +1,21 @@
 // A frame's 3D read from the page (docs/web-export.md M3): every `data-3d` element the SDK's components rendered, as
 // the tree raea-web reads (engine/web/src/scene.rs), in tree order. Each element keeps an id while it lives, and its
-// props and shape text go only when they changed since they were last sent: a ground's vertex buffer crosses once.
+// props, shape and placements text go only when they changed since they were last sent: a ground's vertex buffer and
+// a field's placements cross once.
 
 export interface Part {
   k: string;
   i: number;
   p?: string | null;
   s?: string | null;
+  /** an <Instances>' placements (its data-at text) */
+  a?: string | null;
   c?: Part[];
 }
 
 export class Collector {
   private ids = new WeakMap<Element, number>();
-  private sent = new WeakMap<Element, { p: string | null; s: string | null }>();
+  private sent = new WeakMap<Element, { p: string | null; s: string | null; a: string | null }>();
   private next = 1;
 
   /** `pixel`: the engine draws at 1/pixel of the composition's size (PlayOptions.pixel) and the canvas scales it up with
@@ -45,11 +48,14 @@ export class Collector {
     let p = el.getAttribute("data-props");
     if (p && this.pixel !== 1 && el.getAttribute("data-3d") === "Look") p = this.scaled(p);
     const s = el.getAttribute("data-shape");
+    const a = el.getAttribute("data-at");
     const was = this.sent.get(el);
     const part: Part = { k: el.getAttribute("data-3d")!, i };
     if (!was || was.p !== p) part.p = p;
     if (!was || was.s !== s) part.s = s;
-    this.sent.set(el, { p, s });
+    // an <Instances>' copies are where its data-at puts them: without it the engine has nowhere to draw them
+    if (!was || was.a !== a) part.a = a;
+    this.sent.set(el, { p, s, a });
     return part;
   }
 

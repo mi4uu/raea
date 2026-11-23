@@ -1,7 +1,8 @@
 //! A frame's scene from the page: the tree of `data-3d` parts (sdk/web's collector writes it) as Node3s, the same
 //! values native play reads from its React tree (raea-runtime-react's read3d).
 //!
-//! Each part comes as `{k: kind, i: id, p?: props JSON text, s?: shape text | null, c?: kids}`. The page keeps each
+//! Each part comes as `{k: kind, i: id, p?: props JSON text, s?: shape text | null, a?: placements text | null, c?: kids}`
+//! (`a`: an <Instances>' data-at, its copies' places). The page keeps each
 //! element's id while it lives and sends `p` and `s` only when their text changed since it last sent them; the rest
 //! are this side's, kept by id. A ground's vertex buffer or a field's placements cross once, not every frame, and are
 //! parsed once (native play keeps them the same way, props3d).
@@ -14,7 +15,8 @@ use serde_json::{Map, Value};
 
 #[derive(Default)]
 pub struct Parts {
-    kept: HashMap<u64, (Arc<Map<String, Value>>, Option<Arc<str>>)>,
+    /// each part's props, shape and placements, as last sent
+    kept: HashMap<u64, (Arc<Map<String, Value>>, Option<Arc<str>>, Option<Arc<str>>)>,
 }
 
 impl Parts {
@@ -45,13 +47,18 @@ impl Parts {
         let shape = match v.get("s") {
             Some(Value::String(s)) => Some(s.as_str().into()),
             Some(_) => None,
-            None => had.and_then(|h| h.1),
+            None => had.as_ref().and_then(|h| h.1.clone()),
         };
-        self.kept.insert(id, (props.clone(), shape.clone()));
+        let at = match v.get("a") {
+            Some(Value::String(a)) => Some(a.as_str().into()),
+            Some(_) => None,
+            None => had.and_then(|h| h.2),
+        };
+        self.kept.insert(id, (props.clone(), shape.clone(), at.clone()));
         let kids = match v["c"].as_array() {
             Some(k) => k.iter().map(|n| self.node(n, seen)).collect::<Result<Vec<_>, _>>()?,
             None => Vec::new(),
         };
-        Ok(Node3 { kind: kind.into(), props, shape, at: None, kids: kids.into() })
+        Ok(Node3 { kind: kind.into(), props, shape, at, kids: kids.into() })
     }
 }
